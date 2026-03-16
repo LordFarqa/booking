@@ -18,6 +18,12 @@ class Room extends Model
         'class_id',
         'floor'
     ];
+    protected $hidden = [
+        'class_id',
+        'id'
+    ];
+
+
 
     public function hotel(){
         return $this->belongsTo(Hotel::class,foreignKey: 'hotel_id');

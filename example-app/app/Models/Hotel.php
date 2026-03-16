@@ -14,8 +14,14 @@ class Hotel extends Model
     protected $table = "hotels";
     protected $fillable = [
         'name',
-        'adress'
+        'address',
+        'class'
     ];
+    protected $casts = [
+        'address' => 'array',
+        'class'=>'array'
+    ];
+
 
     public function rooms(){
         return $this->hasMany(Room::class,'hotel_id');

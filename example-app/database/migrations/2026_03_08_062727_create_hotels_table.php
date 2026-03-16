@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('hotels', function (Blueprint $table) {
             $table->increments('id');
             $table->string('name', 60);
-            $table->json('adress');
+            $table->json('address');
         });
     }
 

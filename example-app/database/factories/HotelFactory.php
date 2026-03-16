@@ -12,19 +12,23 @@ class HotelFactory extends Factory
     {
         return [
             'name'=>fake()->monthName().' '.fake()->unique()->company(),
-            'adress'=>json_encode([
+            'address'=>json_encode([
                 'Страна'=>fake()->country(),
                 'Город'=>fake()->city(),
-                'Улица'=>fake()->streetAddress()
-            ])
+                'Улица'=>fake()->streetAddress()],JSON_UNESCAPED_UNICODE),
+            'class'=>fake()->randomElement([
+                    '1 star',
+                    '2 stars',
+                    '3 stars',
+                    '4 stars',
+                    '5 stars'])
         ];
     }
     public function configure(){
 
         return $this->afterCreating(function (Hotel $hotel){
             Room::factory()->count(rand(40,100))->create([
-                'number'=>$hotel->id + fake()->unique()->numberBetween(1,500),
-                'hotel_id'=>$hotel->id,
+                'hotel_id'=>$hotel->id
             ]);
 
         });
