@@ -2,58 +2,53 @@
 
 namespace App\Http\Controllers\Room;
 
-
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use App\Services\Admin\RoomService;
 use App\Dto\Room\RoomCrearteDto;
 use App\Dto\Room\RoomUpdateDto;
-use App\Services\Admin\RoomService;
-use Illuminate\Http\Request;
-use Illuminate\Routing\Controller as BaseController;
 
-use Response;
-use Symfony\Component\HttpFoundation\JsonResponse;
-
-class RoomController extends BaseController
+class RoomController extends Controller
 {
-    private RoomService $roomService;
+    public function __construct(private RoomService $roomService){}
 
-    function __construct(RoomService $roomService){
-        $this->roomService = $roomService;
-    }
-
-    public function createRoom(int $id,Request $request){
-        $data = $request->validate([
-            'number' => 'required|int',
-            'class_id' => 'required|int',
-            'floor' => 'required|int'
+    public function createRoom($hotelId, Request $request)
+    {
+        $validated = $request->validate([
+            'number' => 'required|integer|min:1',
+            'class_id' => 'required|exists:room_classes,id',
+            'floor' => 'required|integer|min:1'
         ]);
-        $dto = new RoomCrearteDto($id,$data);
-        $room = $this->roomService->createRoom($dto)->toArray();
-        if(!$room){
-            return response()->json(['room is not created'],500);
-        }
-        return response()->json($room,201);
-    }
-    public function updateRoom(int $id,Request $request){
-        $data = $request->validate([
-            'hotel_id'=>'required|int',
-            'number' => 'required|int',
-            'class_id' => 'required|int',
-            'floor' => 'required|int'
-        ]);
-        $dto = new RoomUpdateDto($id,$data);
-        $room = $this->roomService->updateRoom($dto)->toArray();
-        if(!$room){
-            return response()->json(['room is not created'],500);
-        }
-        return response()->json($room,201);
-    }
-    public function deleteRoom(int $id){
-        try {
 
-            $this->roomService->deleteRoom($id);
-            return response()->json('delete', 200);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        }
+        $dto = new RoomCrearteDto($hotelId, $validated);
+
+        $room = $this->roomService->createRoom($dto);
+
+        return response()->json($room->toArray(), 201);
+    }
+
+    public function updateRoom($id, Request $request)
+    {
+        $validated = $request->validate([
+            'number' => 'sometimes|integer|min:1',
+            'hotel_id' => 'sometimes|exists:hotels,id',
+            'class_id' => 'sometimes|exists:room_classes,id',
+            'floor' => 'sometimes|integer|min:1'
+        ]);
+
+        $dto = new RoomUpdateDto($id, $validated);
+
+        $room = $this->roomService->updateRoom($dto);
+
+        return response()->json($room);
+    }
+
+    public function deleteRoom($id)
+    {
+        $this->roomService->deleteRoom($id);
+
+        return response()->json([
+            'message' => 'Room deleted successfully'
+        ]);
     }
 }

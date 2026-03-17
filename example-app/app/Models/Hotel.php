@@ -29,6 +29,9 @@ class Hotel extends Model
     public function reviews(){
         return $this->hasMany(Reviews::class,'hotel_id');
     }
-
+    public function getAverageRatingAttribute()
+    {
+        return $this->reviews()->avg('rating') ?? 0;
+    }
 
 }

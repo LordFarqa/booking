@@ -18,6 +18,9 @@ class CreatePersonalAccessTokensTable extends Migration
                 $table->timestamp('last_used_at')->nullable();
                 $table->timestamp('expires_at')->nullable();
                 $table->timestamps();
+                
+                // Индексы для быстрого поиска
+                $table->index(['tokenable_type', 'tokenable_id']);
             });
         }
     }

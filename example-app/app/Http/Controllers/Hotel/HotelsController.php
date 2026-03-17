@@ -2,172 +2,98 @@
 
 namespace App\Http\Controllers\Hotel;
 
-use App\Dto\Hotel\CreateHotelDto;
-use App\Dto\Hotel\UpdateHotelDto;
-use App\Services\Admin\HotelService;
+use App\Http\Controllers\Controller;
+use App\Models\Hotel;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controller as BaseController;
 
-use Response;
-use Symfony\Component\HttpFoundation\JsonResponse;
-
-class HotelsController extends BaseController
+class HotelsController extends Controller
 {
-    private HotelService $hotelService;
-    
-    /**
-     * Create a new controller instance.
-     * 
-     * @param HotelService $hotelService
-     * @return void
-     */
-    function __construct(HotelService $hotelService){
-        $this->hotelService = $hotelService;
-    }
-    
-    /**
-     * Get a list of all hotels.
-     * 
-     * Retrieves all available hotels from the database.
-     *
-     * @return JsonResponse
-     * 
-     * @response 200 {
-     *   "data": [
-     *     {
-     *       "id": 1,
-     *       "name": "Grand Hotel",
-     *       "address": "123 Main St",
-     *       "description": "Luxury hotel in city center"
-     *     }
-     *   ]
-     * }
-     * @response 404 {
-     *   "message": "Bad route"
-     * }
-     */
-    public function show(): JsonResponse{
-        $hotels = $this->hotelService->getHotels()->toArray();
-        if (!$hotels) {
-            return response()->json([
-                'message' => 'Bad route'
-            ], 404);
-        }
-        return response()->json($hotels,200, [], JSON_UNESCAPED_UNICODE);
-    }
-    
-    /**
-     * Get a specific hotel by its name.
-     * 
-     * Retrieves detailed information about a single hotel.
-     *
-     * @param string $hotel_name The name of the hotel to retrieve
-     * @return JsonResponse
-     * 
-     * @urlParam hotel_name string required The name of the hotel. Example: "Grand Hotel"
-     * 
-     * @response 200 {
-     *   "data": {
-     *     "id": 1,
-     *     "name": "Grand Hotel",
-     *     "address": "123 Main St",
-     *     "description": "Luxury hotel in city center",
-     *     "rating": 4.5
-     *   }
-     * }
-     * @response 404 {
-     *   "message": "Bad route"
-     * }
-     */
-    public function showHotelById(int $id): JsonResponse{
-        $hotel = $this->hotelService->getHotel($id);
-        if (!$hotel) {
-            return response()->json([
-                'message' => 'Bad route'
-            ], 404);
-        }
-        return response()->json($hotel,200, [], JSON_UNESCAPED_UNICODE);
-    }
-    
-    /**
-     * Get all rooms for a specific hotel.
-     * 
-     * Retrieves all available rooms belonging to the specified hotel.
-     *
-     * @param string $hotel_name The name of the hotel
-     * @return JsonResponse
-     * 
-     * @urlParam hotel_name string required The name of the hotel. Example: "Grand Hotel"
-     * 
-     * @response 200 {
-     *   "data": {
-     *     "hotel_name": "Grand Hotel",
-     *     "rooms": [
-     *       {
-     *         "id": 101,
-     *         "number": "101",
-     *         "type": "Deluxe",
-     *         "price": 200.00,
-     *         "available": true
-     *       }
-     *     ]
-     *   }
-     * }
-     * @response 404 {
-     *   "message": "Bad route"
-     * }
-     */
-    public function showRooms($id){
-        $hotel = $this->hotelService->showRooms($id)->toArray();
-        if (!$hotel) {
-            return response()->json([
-                'message' => 'Bad route'
-            ], 404);
-        }
-        return response()->json($hotel,200, [], JSON_UNESCAPED_UNICODE);
-    }
 
-
-
-    public function createHotel(Request $request){
-        $data = $request->validate(
-            [
-                'name' => 'required|string',
-                'address' => 'required|array',
-                'class' => 'required|string'
-            ]
-        );
-        $dto = new CreateHotelDto($data);
-
-        $hotel = $this->hotelService->createHotel($dto);
-
-        return response()->json($hotel,201);
-
-
-    }
-    public function updateHotel($id,Request $request)
+    public function show(Request $request)
     {
-        $data = $request->validate([
-            'name' => 'required|string',
-            'address' => 'required|array',
-            'class' => 'required|string'
+        $perPage = $request->get('per_page', 15);
+        $page = $request->get('page', 1);
+        
+        $hotels = Hotel::select('id', 'name', 'address', 'class')
+            ->withCount('rooms')
+            ->get();
+        
+        $formattedHotels = $hotels->map(function ($hotel) {
+            $averageRating = $hotel->reviews()->avg('rating') ?? 0;
+            $totalReviews = $hotel->reviews()->count();
+            
+            return [
+                'id' => $hotel->id,
+                'name' => $hotel->name,
+                'address' => $hotel->address,
+                'class' => $hotel->class,
+                'rooms_count' => $hotel->rooms_count,
+                'rating' => [
+                    'average' => round($averageRating, 1),
+                    'total' => $totalReviews
+                ]
+            ];
+        });
+        
+        $total = $formattedHotels->count();
+        $items = $formattedHotels->forPage($page, $perPage)->values();
+        
+        return response()->json([
+            'data' => $items,
+            'pagination' => [
+                'current_page' => $page,
+                'last_page' => ceil($total / $perPage),
+                'per_page' => $perPage,
+                'total' => $total,
+                'next_page_url' => $page < ceil($total / $perPage) 
+                    ? url("/api/hotels?page=" . ($page + 1) . "&per_page=$perPage") 
+                    : null,
+                'prev_page_url' => $page > 1 
+                    ? url("/api/hotels?page=" . ($page - 1) . "&per_page=$perPage") 
+                    : null
+            ]
         ]);
-
-        try {
-            $dto = new UpdateHotelDto($id,$data);
-            $hotel = $this->hotelService->updateHotel($dto);
-            return response()->json($hotel, 200);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        }
     }
-    public function deleteHotel($id){
-        try {
 
-            $this->hotelService->deleteHotel($id);
-            return response()->json('delete', 200);
-        } catch (\Exception $e) {
-            return response()->json(['error' => $e->getMessage()], 404);
-        }
+
+    public function showHotelById($id)
+    {
+        $hotel = Hotel::with(['rooms' => function($query) {
+            $query->with('room_classes');
+        }])->withAvg('reviews', 'rating')
+          ->withCount('reviews')
+          ->findOrFail($id);
+
+        return response()->json([
+            'data' => $hotel,
+            'average_rating' => round($hotel->reviews_avg_rating ?? 0, 1),
+            'total_reviews' => $hotel->reviews_count
+        ]);
+    }
+
+    public function showRooms($id, Request $request)
+    {
+        $perPage = $request->get('per_page', 15);
+        $page = $request->get('page', 1);
+        
+        $hotel = Hotel::findOrFail($id);
+        
+        $rooms = $hotel->rooms()
+            ->with('room_classes')
+            ->paginate($perPage, ['*'], 'page', $page);
+            
+        return response()->json([
+            'hotel_id' => $id,
+            'hotel_name' => $hotel->name,
+            'data' => $rooms->items(),
+            'pagination' => [
+                'current_page' => $rooms->currentPage(),
+                'last_page' => $rooms->lastPage(),
+                'per_page' => $rooms->perPage(),
+                'total' => $rooms->total(),
+                'next_page_url' => $rooms->nextPageUrl(),
+                'prev_page_url' => $rooms->previousPageUrl()
+            ]
+        ]);
     }
 }

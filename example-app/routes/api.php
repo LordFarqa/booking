@@ -1,37 +1,45 @@
 <?php
-use App\Http\Controllers\Room\RoomController;
-use App\Http\Controllers\UsersController;
+// routes/api.php
 
+use App\Http\Controllers\Auth\AuthController;
+use App\Http\Controllers\Booking\BookingController;
+use App\Http\Controllers\Review\ReviewController;
 use App\Http\Controllers\Hotel\HotelsController;
-
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Публичные маршруты
+Route::post('/login', [AuthController::class, 'login']);
+Route::post('/register', [AuthController::class, 'register']);
 
-Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
-    return $request->user();
+// Поиск (публичный)
+Route::get('/rooms/available', [BookingController::class, 'searchAvailable']);
+Route::get('/rooms/{roomId}/schedule', [BookingController::class, 'roomSchedule']);
+
+// Отзывы (публичный)
+Route::get('/hotels/{hotelId}/reviews', [ReviewController::class, 'hotelReviews']);
+
+// Отели (публичный)
+Route::get('/hotels', [HotelsController::class, 'show']);
+Route::get('/hotels/{id}', [HotelsController::class, 'showHotelById']);
+
+// Защищенные маршруты
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/me', [AuthController::class, 'me']);
+    Route::post('/logout', [AuthController::class, 'logout']);
+    
+    // Бронирования
+    Route::prefix('bookings')->group(function () {
+        Route::post('/', [BookingController::class, 'store']);
+        Route::get('/my', [BookingController::class, 'myBookings']);
+        Route::put('/{id}/cancel', [BookingController::class, 'cancelByUser']);
+        Route::get('/completed', [BookingController::class, 'getCompletedBookings']);
+    });
+    
+
+    Route::post('/reviews', [ReviewController::class, 'store']);
 });
-//admin
 
-    //user
-Route::prefix('admin')->group(function () {
-    Route::get('/users', [UsersController::class, 'show']);
-    Route::get('/user/{login}', [UsersController::class, 'showUserByLogin']);
 
-    Route::post('/user/create', [UsersController::class,'createUser']);
-    Route::put('/user/update/{id}', [UsersController::class,'updateUser']);
-    Route::delete('/user/delete/{id}', [UsersController::class,'deleteUser']);
+Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function () {
+    Route::put('/bookings/{id}/cancel', [BookingController::class, 'cancelByAdmin']);
 });
-
-    //hotel
-Route::get('/admin/hotels/', [HotelsController::class, 'show']);
-    Route::get('/admin/hotel/{id}', [HotelsController::class, 'showHotelById']);   
-    Route::post('/admin/hotel/create',[HotelsController::class,'createHotel']);
-    Route::put('/admin/hotel/update/{id}',[HotelsController::class,'updateHotel']);
-    Route::delete('/admin/hotel/delete/{id}',[HotelsController::class,'deleteHotel']);
-
-    //rooms
-    Route::get('/admin/hotel/{id}/rooms', [HotelsController::class, 'showRooms']);
-    Route::post('/admin/hotel/{id}/create/room', [RoomController::class, 'createRoom']);
-    Route::put('/admin/hotel/room/update/{id}', [RoomController::class, 'updateRoom']);
-    Route::delete('/admin/hotel/room/delete/{id}', [RoomController::class, 'deleteRoom']);

@@ -8,31 +8,27 @@ use App\Models\Room;
 
 
 
-class RoomService
-{
-    public function createRoom(RoomCrearteDto $roomCreateDto){
-        $data = $roomCreateDto->toArray();
-        $room = Room::create($data);
-        $room->load('room_classes');
-        
-        $class = $room->room_classes->name;
+class RoomService{
+    public function createRoom(RoomCrearteDto $dto){
+    $room = Room::create($dto->toArray());
 
-        $data['class']=$class;
-        return new RoomCreateResponseDto($data);
+    $room->load('room_classes');
 
+    return new RoomCreateResponseDto([
+        'number' => $room->number,
+        'hotel_id' => $room->hotel_id,
+        'class' => $room->room_classes->name,
+        'floor' => $room->floor
+    ]);
+}
+
+public function updateRoom(RoomUpdateDto $dto){
+        $room = Room::findOrFail($dto->getId());
+
+        $room->update(array_filter($dto->toArray()));
+
+        return $room->load('room_classes');
     }
-    public function updateRoom(RoomUpdateDto $roomUpdateDto){
-
-        $room = Room::findOrFail($roomUpdateDto->getId());
-        $room->update($roomUpdateDto->toArray());
-
-        return $room;
-
-    }
-    public function deleteRoom(int $id){
-        $room = Room::findOrFail($id);
-        $room->delete();
-
-    }
+    
 }
 ?>
