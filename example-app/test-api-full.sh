@@ -266,39 +266,72 @@ AVAILABLE_REVIEWS=$(echo $COMPLETED_BOOKINGS | grep -o '"booking_id"' | wc -l)
 print_success "Доступно для отзыва: $AVAILABLE_REVIEWS"
 read -p "Нажмите Enter для продолжения..."
 
-# 12. Создание отзыва
+# 12. ОТЗЫВ: POST /api/reviews
 print_step "12. ОТЗЫВ: POST /api/reviews"
 
-# Используем ID из предыдущего шага или получаем из API
-if [ -z "$COMPLETED_BOOKING_ID" ]; then
-    COMPLETED_BOOKING_ID=$(echo $COMPLETED_BOOKINGS | grep -o '"booking_id":[0-9]*' | head -1 | cut -d':' -f2)
-fi
+# Используем бронирование 108
+COMPLETED_BOOKING_ID=108
+HOTEL_ID=3  # Отель для комнаты 162
 
-if [ ! -z "$COMPLETED_BOOKING_ID" ] && [ "$COMPLETED_BOOKING_ID" != "null" ]; then
-    print_success "Используем бронирование ID: $COMPLETED_BOOKING_ID для отзыва"
+print_success "Используем бронирование ID: $COMPLETED_BOOKING_ID для отзыва"
+
+# ВАЖНО: Используем правильный формат JSON с экранированием кавычек
+echo -e "${YELLOW}Отправляем JSON запрос...${NC}"
+
+# Создаем временный файл с JSON данными
+cat > review_data.json << EOF
+{
+    "hotel_id": $HOTEL_ID,
+    "booking_room_id": $COMPLETED_BOOKING_ID,
+    "coment": "Отличный отель! Прекрасный сервис, чистые номера, вежливый персонал. Обязательно вернемся еще!",
+    "rating": 5
+}
+EOF
+
+echo -e "${YELLOW}JSON данные:${NC}"
+cat review_data.json
+
+# Отправляем запрос с JSON из файла
+REVIEW_RESPONSE=$(curl -s -X POST $BASE_URL/reviews \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -H "Accept: application/json" \
+  -d @review_data.json)
+
+echo -e "\n${YELLOW}Ответ сервера:${NC}"
+echo $REVIEW_RESPONSE | json_pp
+
+# Удаляем временный файл
+rm review_data.json
+
+# Проверяем результат
+if echo $REVIEW_RESPONSE | grep -q "successfully\|created"; then
+    print_success "Отзыв успешно создан!"
+elif echo $REVIEW_RESPONSE | grep -q "errors"; then
+    print_error "Ошибка валидации"
+    # Показываем детали ошибки
+    echo $REVIEW_RESPONSE | json_pp | grep -A 10 "errors"
     
-    REVIEW_RESPONSE=$(curl -s -X POST $BASE_URL/reviews \
+    # Альтернативный способ: отправляем данные как form-data
+    echo -e "\n${YELLOW}Пробуем отправить как form-data...${NC}"
+    
+    REVIEW_RESPONSE2=$(curl -s -X POST $BASE_URL/reviews \
       -H "Authorization: Bearer $TOKEN" \
       -H "Accept: application/json" \
-      -H "Content-Type: application/json" \
-      -d "{
-        \"hotel_id\": 3,
-        \"booking_room_id\": $COMPLETED_BOOKING_ID,
-        \"coment\": \"Отличный отель! Прекрасный сервис, чистые номера, вежливый персонал. Обязательно вернемся еще!\",
-        \"rating\": 5
-      }")
+      -F "hotel_id=$HOTEL_ID" \
+      -F "booking_room_id=$COMPLETED_BOOKING_ID" \
+      -F "coment=Отличный отель! Прекрасный сервис, чистые номера, вежливый персонал. Обязательно вернемся еще!" \
+      -F "rating=5")
     
-    echo $REVIEW_RESPONSE | json_pp
+    echo $REVIEW_RESPONSE2 | json_pp
     
-    if echo $REVIEW_RESPONSE | grep -q "successfully"; then
-        print_success "Отзыв успешно создан!"
-    else
-        print_error "Ошибка создания отзыва"
+    if echo $REVIEW_RESPONSE2 | grep -q "successfully\|created"; then
+        print_success "Отзыв успешно создан через form-data!"
     fi
 else
-    print_error "Нет доступных бронирований для отзыва"
+    print_error "Неизвестный ответ"
+    echo $REVIEW_RESPONSE
 fi
-read -p "Нажмите Enter для продолжения..."
 
 # 13. Проверка созданного отзыва
 print_step "13. ПРОВЕРКА: GET /api/hotels/3/reviews"
